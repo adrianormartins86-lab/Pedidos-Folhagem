@@ -420,7 +420,7 @@ elif perfil_navegacao == "Visão das Lojas":
             <div class="topbar-left">
                 <span style="font-size:22px">🥬</span>
                 <div>
-                    <div class="topbar-title">{loja_selecionada} ({id_loja}) — Folhagem</div>
+                    <div class="topbar-title">{loja_selecionada} — Folhagem</div>
                     <div class="topbar-sub">Preencha a quantidade de cada produto por fornecedor</div>
                 </div>
             </div>
