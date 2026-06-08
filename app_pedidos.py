@@ -135,7 +135,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
 # ─────────────────────────────────────────────
 LOJAS = ["Loja 01", "Loja 02", "Loja 03", "Loja 04", "Loja 05", "Loja 06", "Loja 07", "Loja 08"]
 
-MAPA_LOJAS = dict(zip(LOJAS, NOVOS_NOMES_LOJAS))
+MAPA_LOJAS = dict(zip(LOJAS))
 
 # ─────────────────────────────────────────────
 # ESTRUTURA DE FORNECEDORES E PRODUTOS (do Excel)
