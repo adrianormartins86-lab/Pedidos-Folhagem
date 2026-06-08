@@ -596,6 +596,7 @@ elif perfil_navegacao == "Visão Fornecedores (Resumo)":
                         use_container_width=True,
                         column_config=col_cfg_forn,
                         height=altura,
+                        num_rows="fixed",
                         key=f"forn_folhagem_{fornecedor}_{st.session_state['reset_counter_folhagem']}"
                     )
 
