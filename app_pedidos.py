@@ -321,6 +321,7 @@ with st.sidebar:
     
     if st.button("🔄 Sincronizar Dados", use_container_width=True):
         st.cache_data.clear()
+        st.session_state['reset_counter_folhagem'] += 1
         st.rerun()
         
     st.write("<br>", unsafe_allow_html=True)
@@ -573,7 +574,8 @@ elif perfil_navegacao == "Visão Fornecedores (Resumo)":
             for c in lojas_cols_renomeadas:
                 col_cfg_forn[c] = st.column_config.NumberColumn(c, format="%d", disabled=False, min_value=0)
 
-            altura = int((len(df_forn) + 2) * 36) + 5
+            # 🔥 AJUSTE APLICADO AQUI: Altura exata sem sobrar linha em branco 🔥
+            altura = (len(df_forn) * 35) + 42 
 
             with cols[j]:
                 with st.container(border=True):
@@ -610,7 +612,7 @@ elif perfil_navegacao == "Visão Fornecedores (Resumo)":
         st.write("<br>", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# ROTA 4 — CATÁLOGO DE PRODUTOS (Nova Rota)
+# ROTA 4 — CATÁLOGO DE PRODUTOS
 # ─────────────────────────────────────────────
 elif perfil_navegacao == "Catálogo de Produtos":
     st.markdown("""
@@ -642,11 +644,12 @@ elif perfil_navegacao == "Catálogo de Produtos":
             height=600,
             num_rows="dynamic",
             column_config=col_cfg_cat,
-            key="editor_catalogo_folhagem"
+            key=f"editor_catalogo_folhagem_{st.session_state['reset_counter_folhagem']}"
         )
         
         st.divider()
         if st.button("💾 Salvar Catálogo no Google Sheets", type="primary", use_container_width=True):
             salvar_catalogo(edited_cat)
+            st.session_state['reset_counter_folhagem'] += 1
             st.success("✅ Catálogo atualizado com sucesso! As alterações já refletem na visão das lojas.")
             st.rerun()
