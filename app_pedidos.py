@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+from streamlit_gsheets import GSheetsConnection
 
 # ─────────────────────────────────────────────
 # CONFIGURAÇÃO DA PÁGINA
@@ -136,9 +137,6 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
 LOJAS = ["Loja 01", "Loja 02", "Loja 03", "Loja 04", "Loja 05", "Loja 06", "Loja 07", "Loja 08"]
 MAPA_LOJAS = {l: l for l in LOJAS}
 
-# ─────────────────────────────────────────────
-# ESTRUTURA DE FORNECEDORES E PRODUTOS (do Excel)
-# ─────────────────────────────────────────────
 FORNECEDORES_CONFIG = {
     "Sidnei / Evanilde": {
         "lojas": ["Loja 01", "Loja 02", "Loja 03", "Loja 04", "Loja 05", "Loja 06"],
@@ -214,21 +212,42 @@ FORNECEDORES_CONFIG = {
 }
 
 # ─────────────────────────────────────────────
-# INICIALIZAÇÃO DO SESSION STATE
+# CONEXÃO GOOGLE SHEETS & FUNÇÕES DE DADOS
 # ─────────────────────────────────────────────
-if 'df_pedidos_folhagem' not in st.session_state:
-    linhas = []
-    for forn, cfg in FORNECEDORES_CONFIG.items():
-        for prod in cfg["produtos"]:
-            linha = {
-                "Fornecedor": forn,
-                "Código": prod["Código"],
-                "Descrição": prod["Descrição"],
-            }
-            for loja in LOJAS:
-                linha[loja] = 0
-            linhas.append(linha)
-    st.session_state['df_pedidos_folhagem'] = pd.DataFrame(linhas)
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+@st.cache_data(ttl=15) # O Cache atualiza a cada 15 segundos para sincronizar as lojas
+def carregar_pedidos():
+    df = conn.read(worksheet="Folhagem")
+    
+    # Se a planilha estiver vazia, cria a estrutura inicial e joga pro Sheets
+    if df.empty or "Fornecedor" not in df.columns:
+        linhas = []
+        for forn, cfg in FORNECEDORES_CONFIG.items():
+            for prod in cfg["produtos"]:
+                linha = {
+                    "Fornecedor": forn,
+                    "Código": prod["Código"],
+                    "Descrição": prod["Descrição"],
+                }
+                for loja in LOJAS:
+                    linha[loja] = 0
+                linhas.append(linha)
+        df_init = pd.DataFrame(linhas)
+        conn.update(worksheet="Folhagem", data=df_init)
+        return df_init
+    
+    # Tratamento de segurança: Garante que quantidades são inteiros e não nulos
+    for loja in LOJAS:
+        if loja in df.columns:
+            df[loja] = pd.to_numeric(df[loja], errors='coerce').fillna(0).astype(int)
+            
+    return df
+
+def salvar_pedidos(df_to_save):
+    # Atualiza o Google Sheets e limpa o cache para forçar leitura nova
+    conn.update(worksheet="Folhagem", data=df_to_save)
+    st.cache_data.clear()
 
 if 'reset_counter_folhagem' not in st.session_state:
     st.session_state['reset_counter_folhagem'] = 0
@@ -316,22 +335,24 @@ with st.sidebar:
         perfil_navegacao = "Visão das Lojas"
 
     st.divider()
-    df_ped = st.session_state['df_pedidos_folhagem']
+    
+    # Indicador de Preenchimento (Lê do Sheets)
+    df_ped = carregar_pedidos()
     total_preenchidos = (df_ped[LOJAS] > 0).any(axis=1).sum()
     st.metric("Itens c/ pedido", total_preenchidos, help="Itens com ao menos 1 quantidade preenchida")
+    
     st.divider()
-
     if st.button("🚪 Sair / Logout", use_container_width=True):
         st.session_state['usuario_logado_folhagem'] = None
         st.rerun()
 
 # ─────────────────────────────────────────────
-# FUNÇÃO MODAL DE CONFIRMAÇÃO PARA ZERAR
+# FUNÇÃO MODAL DE CONFIRMAÇÃO PARA ZERAR (VIA GOOGLE SHEETS)
 # ─────────────────────────────────────────────
 @st.dialog("🚨 Confirmação Necessária")
 def modal_zerar_pedidos():
     st.markdown("Tem certeza que deseja **zerar todos os pedidos** de todas as lojas?")
-    st.markdown("⚠️ *Esta ação não poderá ser desfeita.*")
+    st.markdown("⚠️ *Esta ação irá zerar as quantidades diretamente no Google Sheets.*")
     
     st.write("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -341,7 +362,10 @@ def modal_zerar_pedidos():
     with c2:
         if st.button("✔️ Sim, zerar tudo", type="primary", use_container_width=True):
             st.session_state['reset_counter_folhagem'] += 1
-            st.session_state['df_pedidos_folhagem'][LOJAS] = 0
+            df_main = carregar_pedidos()
+            for loja in LOJAS:
+                df_main[loja] = 0
+            salvar_pedidos(df_main)
             st.rerun()
 
 # ─────────────────────────────────────────────
@@ -359,7 +383,7 @@ if perfil_navegacao == "Separação e Fechamento":
     """, unsafe_allow_html=True)
 
     with st.container(border=True):
-        df_base = st.session_state['df_pedidos_folhagem'].copy()
+        df_base = carregar_pedidos()
         df_base["TOTAL GERAL"] = df_base[LOJAS].sum(axis=1)
 
         col_cfg = {
@@ -388,14 +412,10 @@ if perfil_navegacao == "Separação e Fechamento":
 
         with col_salvar:
             if st.button("💾 Salvar Alterações", type="primary", use_container_width=True):
-                for _, row in df_editado.iterrows():
-                    mask = (
-                        (st.session_state['df_pedidos_folhagem']["Fornecedor"] == row["Fornecedor"]) &
-                        (st.session_state['df_pedidos_folhagem']["Descrição"] == row["Descrição"])
-                    )
-                    for loja in LOJAS:
-                        st.session_state['df_pedidos_folhagem'].loc[mask, loja] = row[loja]
-                st.success("✅ Pedidos salvos com sucesso!")
+                # Remove a coluna calculada 'TOTAL GERAL' antes de enviar para o Sheets
+                df_to_save = df_editado.drop(columns=["TOTAL GERAL"])
+                salvar_pedidos(df_to_save)
+                st.success("✅ Pedidos salvos na nuvem com sucesso!")
                 st.rerun()
 
         with col_csv:
@@ -413,7 +433,6 @@ if perfil_navegacao == "Separação e Fechamento":
                                use_container_width=True)
 
         with col_zerar:
-            # Chama a função do modal recém-criada em vez de limpar direto
             if st.button("🚨 Zerar Todos os Pedidos", use_container_width=True):
                 modal_zerar_pedidos()
 
@@ -451,7 +470,7 @@ elif perfil_navegacao == "Visão das Lojas":
         if loja_selecionada in cfg["lojas"]
     ]
 
-    df_all = st.session_state['df_pedidos_folhagem']
+    df_all = carregar_pedidos()
     df_loja_view = df_all[df_all["Fornecedor"].isin(fornecedores_da_loja)][
         ["Fornecedor", "Código", "Descrição", loja_selecionada]
     ].copy().rename(columns={loja_selecionada: "Qtde"})
@@ -488,13 +507,17 @@ elif perfil_navegacao == "Visão das Lojas":
         with col_btn:
             st.write("<br>", unsafe_allow_html=True)
             if st.button("💾 Salvar Pedido da Semana", type="primary", use_container_width=True):
+                # Carrega o DF principal para não sobrescrever o que outras lojas fizeram
+                df_main = carregar_pedidos()
                 for _, row in df_editado.iterrows():
                     mask = (
-                        (st.session_state['df_pedidos_folhagem']["Fornecedor"] == row["Fornecedor"]) &
-                        (st.session_state['df_pedidos_folhagem']["Descrição"] == row["Descrição"])
+                        (df_main["Fornecedor"] == row["Fornecedor"]) &
+                        (df_main["Descrição"] == row["Descrição"])
                     )
-                    st.session_state['df_pedidos_folhagem'].loc[mask, loja_selecionada] = row["Qtde"]
-                st.success(f"✅ Pedido da {loja_selecionada} salvo com sucesso!")
+                    df_main.loc[mask, loja_selecionada] = row["Qtde"]
+                
+                salvar_pedidos(df_main)
+                st.success(f"✅ Pedido da {loja_selecionada} enviado para a nuvem com sucesso!")
 
 # ─────────────────────────────────────────────
 # ROTA 3 — VISÃO FORNECEDORES / RESUMO (Admin)
@@ -510,7 +533,7 @@ elif perfil_navegacao == "Visão Fornecedores (Resumo)":
     </div>
     """, unsafe_allow_html=True)
 
-    df_all = st.session_state['df_pedidos_folhagem'].copy()
+    df_all = carregar_pedidos()
     nomes_fornecedores = list(FORNECEDORES_CONFIG.keys())
 
     for i in range(0, len(nomes_fornecedores), 1):
