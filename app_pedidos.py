@@ -153,14 +153,12 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 @st.cache_data(ttl=15)
 def carregar_catalogo_folhagem():
-    df = conn.read(worksheet="Produtos_Folhagem", ttl=0)
+    df = conn.read(worksheet="Produtos_Folhagem", ttl=0, usecols=list(range(20)))
     
     if df.empty:
         return pd.DataFrame(columns=["Código", "Descrição", "Fornecedor"] + LOJAS)
     
-    # 🔥 LIMPEZA AGRESSIVA DE CABEÇALHOS 🔥
-    # Procura em todas as colunas do GSheets. Se tiver "Loja 01" em qualquer formato,
-    # ele renomeia exatamente para o padrão perfeito.
+    # Limpeza de cabeçalhos
     novas_colunas = {}
     for col in df.columns:
         col_str = str(col).strip()
@@ -169,15 +167,18 @@ def carregar_catalogo_folhagem():
                 novas_colunas[col] = loja
     df = df.rename(columns=novas_colunas)
     
-    # 🛡️ PARSER BLINDADO PARA CHECKBOXES 🛡️
+    # 🔥 PARSER CORRIGIDO — trata NaN, bool nativo e string
     for loja in LOJAS:
         if loja not in df.columns:
             df[loja] = False
         else:
-            # Pega o dado cru, transforma em string e valida, retornando BOLEANO puro
-            df[loja] = df[loja].apply(
-                lambda x: str(x).strip().upper() in ['TRUE', 'VERDADEIRO', '1', 'V', 'SIM', 'YES', 'T', 'X']
-            )
+            def parse_bool(x):
+                if isinstance(x, bool):
+                    return x
+                if isinstance(x, (int, float)):
+                    return bool(x) and not pd.isna(x)
+                return str(x).strip().upper() in ['TRUE', 'VERDADEIRO', '1', 'V', 'SIM', 'YES', 'T', 'X']
+            df[loja] = df[loja].apply(parse_bool)
             
     if "Código" in df.columns:
         df["Código"] = pd.to_numeric(df["Código"], errors='coerce').fillna(0).astype(int)
@@ -318,7 +319,6 @@ with st.sidebar:
     
     st.divider()
     
-    # 🚨 BOTÃO DE SINCRONIZAÇÃO
     if st.button("🔄 Sincronizar Dados", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
