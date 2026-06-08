@@ -279,7 +279,10 @@ if st.session_state['usuario_logado_folhagem'] is None:
             st.divider()
             usuarios_permitidos = ["Selecione..."] + ["Administrador"] + LOJAS
             usuario_selecionado = st.selectbox("👤 Usuário de acesso:", usuarios_permitidos)
+            
+            # Bloqueio de autocomplete adicionado aqui
             senha_digitada = st.text_input("🔑 Senha de acesso:", type="password", autocomplete="off")
+            
             st.write("<br>", unsafe_allow_html=True)
 
             if st.button("Entrar no Sistema", type="primary", use_container_width=True):
@@ -478,21 +481,26 @@ elif perfil_navegacao == "Visão das Lojas":
     with st.container(border=True):
         st.info("💡 Preencha a *Qtde* desejada para cada produto. Apenas os fornecedores que atendem esta loja são exibidos.")
 
+        # Otimização visual da tabela para não esticar demais
         col_cfg_loja = {
-            "Fornecedor": st.column_config.TextColumn("Fornecedor", disabled=True),
-            "Código":     st.column_config.NumberColumn("Cód", width=85, format="%d", disabled=True),
-            "Descrição":  st.column_config.TextColumn("Produto", disabled=True),
-            "Qtde":       st.column_config.NumberColumn("🛒 Qtde", width=100, min_value=0, step=1),
+            "Fornecedor": st.column_config.TextColumn("Fornecedor", width=200, disabled=True),
+            "Código":     st.column_config.NumberColumn("Cód", width=80, format="%d", disabled=True),
+            "Descrição":  st.column_config.TextColumn("Produto", width=400, disabled=True),
+            "Qtde":       st.column_config.NumberColumn("🛒 Qtde", width=120, min_value=0, step=1),
         }
 
-        df_editado = st.data_editor(
-            df_loja_view,
-            column_config=col_cfg_loja,
-            hide_index=True,
-            use_container_width=True,
-            height=520,
-            key=f"loja_folhagem_{st.session_state['reset_counter_folhagem']}"
-        )
+        # Criação de margens com colunas vazias
+        _, col_tabela, _ = st.columns([1, 4, 1])
+
+        with col_tabela:
+            df_editado = st.data_editor(
+                df_loja_view,
+                column_config=col_cfg_loja,
+                hide_index=True,
+                use_container_width=True,
+                height=520,
+                key=f"loja_folhagem_{st.session_state['reset_counter_folhagem']}"
+            )
 
         itens_com_pedido = int((df_editado["Qtde"] > 0).sum())
         total_itens      = len(df_editado)
