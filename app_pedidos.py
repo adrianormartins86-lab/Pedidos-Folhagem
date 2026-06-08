@@ -500,9 +500,9 @@ elif perfil_navegacao == "Visão Fornecedores (Resumo)":
     df_all = st.session_state['df_pedidos_folhagem'].copy()
     nomes_fornecedores = list(FORNECEDORES_CONFIG.keys())
 
-    for i in range(0, len(nomes_fornecedores), 2):
-        cols = st.columns(2, gap="small")
-        for j, fornecedor in enumerate(nomes_fornecedores[i:i+2]):
+    for i in range(0, len(nomes_fornecedores), 1):
+        cols = st.columns(1, gap="small")
+        for j, fornecedor in enumerate(nomes_fornecedores[i:i+1]):
             cfg = FORNECEDORES_CONFIG[fornecedor]
             lojas_forn = cfg["lojas"]
             # Nomes renomeados só das lojas que este fornecedor atende
