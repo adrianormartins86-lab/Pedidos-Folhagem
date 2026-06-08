@@ -153,26 +153,31 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 @st.cache_data(ttl=15)
 def carregar_catalogo_folhagem():
-    # ttl=0 contorna o cache interno agressivo do gsheets
     df = conn.read(worksheet="Produtos_Folhagem", ttl=0)
     
     if df.empty:
         return pd.DataFrame(columns=["Código", "Descrição", "Fornecedor"] + LOJAS)
     
-    # Limpa colunas rigorosamente e converte para string
-    df.columns = [str(c).strip() for c in df.columns]
+    # 🔥 LIMPEZA AGRESSIVA DE CABEÇALHOS 🔥
+    # Procura em todas as colunas do GSheets. Se tiver "Loja 01" em qualquer formato,
+    # ele renomeia exatamente para o padrão perfeito.
+    novas_colunas = {}
+    for col in df.columns:
+        col_str = str(col).strip()
+        for loja in LOJAS:
+            if loja.lower() in col_str.lower():
+                novas_colunas[col] = loja
+    df = df.rename(columns=novas_colunas)
     
-    # Tratamento BLINDADO para Checkboxes
+    # 🛡️ PARSER BLINDADO PARA CHECKBOXES 🛡️
     for loja in LOJAS:
         if loja not in df.columns:
             df[loja] = False
         else:
-            def parse_bool(val):
-                if isinstance(val, bool): return val
-                if pd.isna(val): return False
-                v = str(val).strip().upper()
-                return v in ['TRUE', 'VERDADEIRO', '1', 'V', 'SIM', 'YES', 'T']
-            df[loja] = df[loja].apply(parse_bool)
+            # Pega o dado cru, transforma em string e valida, retornando BOLEANO puro
+            df[loja] = df[loja].apply(
+                lambda x: str(x).strip().upper() in ['TRUE', 'VERDADEIRO', '1', 'V', 'SIM', 'YES', 'T', 'X']
+            )
             
     if "Código" in df.columns:
         df["Código"] = pd.to_numeric(df["Código"], errors='coerce').fillna(0).astype(int)
@@ -181,9 +186,18 @@ def carregar_catalogo_folhagem():
 
 @st.cache_data(ttl=15)
 def carregar_pedidos():
-    # ttl=0 para garantir dados frescos
     df_pedidos = conn.read(worksheet="Folhagem", ttl=0)
     df_cat = carregar_catalogo_folhagem()
+    
+    # Aplica a mesma limpeza agressiva na aba de pedidos
+    if not df_pedidos.empty:
+        novas_colunas_ped = {}
+        for col in df_pedidos.columns:
+            col_str = str(col).strip()
+            for loja in LOJAS:
+                if loja.lower() in col_str.lower():
+                    novas_colunas_ped[col] = loja
+        df_pedidos = df_pedidos.rename(columns=novas_colunas_ped)
     
     if df_pedidos.empty or "Fornecedor" not in df_pedidos.columns:
         df_init = df_cat[["Código", "Descrição", "Fornecedor"]].copy()
@@ -196,7 +210,6 @@ def carregar_pedidos():
     if "Código" in df_pedidos.columns:
         df_pedidos["Código"] = pd.to_numeric(df_pedidos["Código"], errors='coerce').fillna(0).astype(int)
         
-    # Garante inteiros nas colunas de pedido
     for loja in LOJAS:
         if loja in df_pedidos.columns:
             df_pedidos[loja] = pd.to_numeric(df_pedidos[loja], errors='coerce').fillna(0).astype(int)
@@ -305,7 +318,7 @@ with st.sidebar:
     
     st.divider()
     
-    # 🚨 BOTÃO DE SINCRONIZAÇÃO FORÇADA ADICIONADO AQUI 🚨
+    # 🚨 BOTÃO DE SINCRONIZAÇÃO
     if st.button("🔄 Sincronizar Dados", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
@@ -440,7 +453,6 @@ elif perfil_navegacao == "Visão das Lojas":
             st.session_state['usuario_logado_folhagem'] = None
             st.rerun()
 
-    # Puxa o catálogo e filtra APENAS os itens habilitados (True) para a loja selecionada
     df_cat = carregar_catalogo_folhagem()
     df_cat_loja = df_cat[df_cat[loja_selecionada] == True].copy()
     
@@ -448,7 +460,6 @@ elif perfil_navegacao == "Visão das Lojas":
         st.warning(f"Nenhum produto habilitado para a {loja_selecionada} no momento.")
         st.stop()
 
-    # Puxa os pedidos atuais e faz um "Left Join" com o catálogo permitido
     df_all = carregar_pedidos()
     df_loja_view = pd.merge(
         df_cat_loja[["Fornecedor", "Código", "Descrição"]],
