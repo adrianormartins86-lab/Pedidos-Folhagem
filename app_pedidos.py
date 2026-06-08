@@ -133,7 +133,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
 # ─────────────────────────────────────────────
 # CONSTANTES
 # ─────────────────────────────────────────────
-LOJAS = [Loja 01"", ""Loja 02"", ""Loja 03"", ""Loja 04"", ""Loja 05"", ""Loja 06"", ""Loja 07"", ""Loja 08""]"
+LOJAS = ["Loja 01", "Loja 02", "Loja 03", "Loja 04", "Loja 05", "Loja 06", "Loja 07", "Loja 08"]
 MAPA_LOJAS = {l: l for l in LOJAS}
 
 # ─────────────────────────────────────────────
@@ -305,7 +305,7 @@ with st.sidebar:
     except Exception:
         st.markdown("🥬")
 
-    st.markdown(f"### Olá, **{usuario_atual}**")
+    st.markdown(f"### Olá, *{usuario_atual}*")
     st.caption("Sistema de Pedidos — Folhagem")
     st.divider()
 
@@ -350,7 +350,7 @@ if perfil_navegacao == "Separação e Fechamento":
             "Fornecedor":  st.column_config.TextColumn("Fornecedor", disabled=True),
             "Código":      st.column_config.NumberColumn("Cód", width=80, format="%d", disabled=True),
             "Descrição":   st.column_config.TextColumn("Produto", disabled=True),
-            "TOTAL GERAL": st.column_config.NumberColumn("TOTAL ▶", width=90, format="%d", disabled=True),
+            "TOTAL GERAL": st.column_config.NumberColumn("TOTAL ▶️", width=90, format="%d", disabled=True),
         }
         for loja, novo_nome in MAPA_LOJAS.items():
             col_cfg[loja] = st.column_config.NumberColumn(novo_nome, format="%d", min_value=0, step=1)
@@ -444,7 +444,7 @@ elif perfil_navegacao == "Visão das Lojas":
     ].copy().rename(columns={loja_selecionada: "Qtde"})
 
     with st.container(border=True):
-        st.info("💡 Preencha a **Qtde** desejada para cada produto. Apenas os fornecedores que atendem esta loja são exibidos.")
+        st.info("💡 Preencha a *Qtde* desejada para cada produto. Apenas os fornecedores que atendem esta loja são exibidos.")
 
         col_cfg_loja = {
             "Fornecedor": st.column_config.TextColumn("Fornecedor", disabled=True),
