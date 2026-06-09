@@ -143,7 +143,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
 # ─────────────────────────────────────────────
 # CONSTANTES
 # ─────────────────────────────────────────────
-LOJAS = [Loja 01"", ""Loja 02"", ""Loja 03"", ""Loja 04"", ""Loja 05"", ""Loja 06"", ""Loja 07"", ""Loja 08""]"
+LOJAS = ["Loja 01", ""Loja 02"", ""Loja 03"", ""Loja 04"", ""Loja 05"", ""Loja 06"", ""Loja 07"", ""Loja 08""]"
 MAPA_LOJAS = {l: l for l in LOJAS}
 
 # ─────────────────────────────────────────────
