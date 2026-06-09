@@ -143,7 +143,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
 # ─────────────────────────────────────────────
 # CONSTANTES
 # ─────────────────────────────────────────────
-LOJAS = ["Loja 01", "Loja 02", "Loja 03", "Loja 04", "Loja 05", "Loja 06", "Loja 07", "Loja 08"]
+LOJAS = [Loja 01"", ""Loja 02"", ""Loja 03"", ""Loja 04"", ""Loja 05"", ""Loja 06"", ""Loja 07"", ""Loja 08""]"
 MAPA_LOJAS = {l: l for l in LOJAS}
 
 # ─────────────────────────────────────────────
@@ -236,8 +236,8 @@ if st.session_state['usuario_logado_folhagem'] is None:
             h1, h2 = st.columns([4, 1])
             with h1:
                 st.markdown("""
-                    <h2 style='margin-bottom:0'>Folhagem — Molicenter</h2>
-                    <p style='color:#7d8590;font-size:14px;margin-top:4px'>Seg a Sáb até 12:00hrs</p>
+                    <h2 style='margin-bottom:0'>Portal de Pedidos</h2>
+                    <p style='color:#7d8590;font-size:14px;margin-top:4px'>Folhagem — Molicenter</p>
                 """, unsafe_allow_html=True)
             with h2:
                 st.write("")
