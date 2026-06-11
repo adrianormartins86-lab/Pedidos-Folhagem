@@ -139,9 +139,9 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
 .topbar-title { font-size: 18px; font-weight: 700; color: var(--text-header); }
 .topbar-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-/* REGRAS DE IMPRESSÃO */
+/* REGRAS DE IMPRESSÃO AJUSTADAS */
 @media print {
-    @page { margin: 10mm; }
+    @page { margin: 5mm 10mm; } /* Reduzida margem de topo/base para caber mais linhas */
     .stApp, .main, body, html {
         background-color: #ffffff !important;
         color: #000000 !important;
@@ -168,9 +168,9 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
         padding-top: 0 !important;
     }
     #print-section h2 {
-        font-size: 16px !important;
-        margin: 0 0 10px 0 !important;
-        padding-bottom: 5px !important;
+        font-size: 15px !important;
+        margin: 0 0 8px 0 !important;
+        padding-bottom: 4px !important;
         border-bottom: 1px solid #000 !important;
         color: #000 !important;
     }
@@ -178,14 +178,14 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
     table.print-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 11px !important;
+        font-size: 10px !important; /* Fonte ligeiramente menor */
         color: #000000 !important;
         font-family: 'IBM Plex Sans', sans-serif;
-        line-height: 1.1 !important;
+        line-height: 1.05 !important;
     }
     table.print-table th, table.print-table td {
         border: 1px solid #000000 !important;
-        padding: 3px 5px !important;
+        padding: 2px 4px !important; /* Espaçamento interno espremido */
         text-align: left;
         color: #000000 !important;
         background-color: #ffffff !important;
@@ -476,7 +476,6 @@ if perfil_navegacao == "Separação e Fechamento":
         # ──────────────────────────────────────────────────────────────
 
         st.divider()
-        # Adicionada a coluna extra para o botão de impressão
         col_salvar, col_csv, col_excel, col_print, col_zerar = st.columns([2.5, 1.2, 1.2, 1.5, 2.5])
 
         with col_salvar:
