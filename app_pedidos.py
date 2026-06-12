@@ -798,7 +798,7 @@ elif perfil_navegacao == "Catálogo de Produtos":
             col_cfg_cat[loja] = st.column_config.CheckboxColumn(loja, default=False)
             
         # Reordenar exibição do catálogo sem Exceção
-       cols_cat_ordem = ["Fornecedor", "Código", "Descrição", "Nome Personalizado"] + LOJAS
+        cols_cat_ordem = ["Fornecedor", "Código", "Descrição", "Nome Personalizado"] + LOJAS
             
         edited_cat = st.data_editor(
             df_catalogo[cols_cat_ordem],
