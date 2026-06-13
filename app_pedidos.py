@@ -243,9 +243,6 @@ def buscar_estoque_pg(loja_nome, codigos):
         return pd.DataFrame({"Código": codigos, "Estoque": 0})
 
 def buscar_produtos_pg(codigos):
-    """
-    Busca SOMENTE as descrições dos códigos solicitados.
-    """
     if not codigos:
         return pd.DataFrame(columns=["Código", "Descrição"])
         
@@ -264,6 +261,46 @@ def buscar_produtos_pg(codigos):
         st.error(f"Erro ao buscar produtos na view python_estoque: {e}")
         return pd.DataFrame()
 
+def atualizar_vendas_90d():
+    query = """
+    WITH vendas_90d AS (
+         SELECT lpd.lcpd_codempresa AS loja,
+            lpd.lcpd_codproduto AS codigo,
+            lpd.lcpd_qtde AS quantidade,
+            lpd.lcpd_dtmvto AS data_venda
+           FROM lpd202605 lpd
+          WHERE (lpd.lcpd_tipoprocesso::text = ANY (ARRAY['VN'::text, 'VP'::text, 'VD'::text, 'VX'::text, 'VB'::text, 'VC'::text])) AND (lpd.lcpd_codempresa::text <= '008'::text OR lpd.lcpd_codempresa::text = '031'::text) AND lpd.lcpd_situacao::text = 'N'::text
+        UNION ALL
+         SELECT lpd.lcpd_codempresa,
+            lpd.lcpd_codproduto,
+            lpd.lcpd_qtde,
+            lpd.lcpd_dtmvto
+           FROM lpd202604 lpd
+          WHERE (lpd.lcpd_tipoprocesso::text = ANY (ARRAY['VN'::text, 'VP'::text, 'VD'::text, 'VX'::text, 'VB'::text, 'VC'::text])) AND (lpd.lcpd_codempresa::text <= '008'::text OR lpd.lcpd_codempresa::text = '031'::text) AND lpd.lcpd_situacao::text = 'N'::text
+        UNION ALL
+         SELECT lpd.lcpd_codempresa,
+            lpd.lcpd_codproduto,
+            lpd.lcpd_qtde,
+            lpd.lcpd_dtmvto
+           FROM lpd202603 lpd
+          WHERE (lpd.lcpd_tipoprocesso::text = ANY (ARRAY['VN'::text, 'VP'::text, 'VD'::text, 'VX'::text, 'VB'::text, 'VC'::text])) AND (lpd.lcpd_codempresa::text <= '008'::text OR lpd.lcpd_codempresa::text = '031'::text) AND lpd.lcpd_situacao::text = 'N'::text
+        )
+    SELECT vendas_90d.loja,
+       vendas_90d.codigo,
+       round(sum(vendas_90d.quantidade) / 90.0, 2) AS media_dia
+      FROM vendas_90d
+     GROUP BY vendas_90d.loja, vendas_90d.codigo
+     ORDER BY vendas_90d.loja, vendas_90d.codigo;
+    """
+    try:
+        df_vendas = conn_pg.query(query)
+        conn.update(worksheet="Folhagem_90d", data=df_vendas)
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao atualizar vendas 90d: {e}")
+        return False
+
 # ─────────────────────────────────────────────
 # FUNÇÕES DE GOOGLE SHEETS
 # ─────────────────────────────────────────────
@@ -271,7 +308,6 @@ def buscar_produtos_pg(codigos):
 def carregar_catalogo_folhagem():
     df = conn.read(worksheet="Produtos_Folhagem", ttl=0, usecols=list(range(20)))
     
-    # Removida a "Exceção" da criação e manipulação
     if df.empty:
         return pd.DataFrame(columns=["Código", "Descrição", "Nome Personalizado", "Fornecedor"] + LOJAS)
     
@@ -336,6 +372,14 @@ def carregar_pedidos():
             df_pedidos[loja] = pd.to_numeric(df_pedidos[loja], errors='coerce').fillna(0).astype(int)
             
     return df_pedidos
+
+@st.cache_data(ttl=30)
+def carregar_vendas_90d():
+    try:
+        df = conn.read(worksheet="Folhagem_90d", ttl=0)
+        return df
+    except Exception:
+        return pd.DataFrame(columns=["loja", "codigo", "media_dia"])
 
 def salvar_pedidos(df_to_save):
     conn.update(worksheet="Folhagem", data=df_to_save)
@@ -443,7 +487,15 @@ with st.sidebar:
         st.cache_data.clear()
         st.session_state['reset_counter_folhagem'] += 1
         st.rerun()
-        
+
+    # Botão de atualizar Vendas 90d (Apenas Admin)
+    if acesso_total:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("📊 Atualizar Vendas 90d", use_container_width=True):
+            with st.spinner("Consultando banco e atualizando planilha..."):
+                if atualizar_vendas_90d():
+                    st.success("✅ Vendas 90d atualizadas!")
+                
     st.write("<br>", unsafe_allow_html=True)
 
     if st.button("🚪 Sair / Logout", use_container_width=True):
@@ -616,28 +668,55 @@ elif perfil_navegacao == "Visão das Lojas":
     mask_personalizado = (df_loja_view["Nome Personalizado"].notna()) & (df_loja_view["Nome Personalizado"].str.strip() != "")
     df_loja_view.loc[mask_personalizado, "Descrição"] = df_loja_view.loc[mask_personalizado, "Nome Personalizado"]
     
-    # Busca o Estoque do Postgres para a Loja Atual
     codigos_lista = df_loja_view["Código"].unique().tolist()
+    
+    # Busca o Estoque do Postgres para a Loja Atual
     df_estoque = buscar_estoque_pg(loja_selecionada, codigos_lista)
     
     # Merge com Estoque
     df_loja_view = pd.merge(df_loja_view, df_estoque, on="Código", how="left")
     df_loja_view["Estoque"] = df_loja_view["Estoque"].fillna(0).astype(int)
+
+    # -------------------------------------------------------------
+    # NOVO: Busca as Vendas de 90 Dias
+    # -------------------------------------------------------------
+    df_vendas_90d = carregar_vendas_90d()
     
+    if not df_vendas_90d.empty and "loja" in df_vendas_90d.columns:
+        # Pega apenas os números da loja (Ex: 'Loja 01' -> '001')
+        loja_id_str = f"{int(loja_selecionada.split()[-1]):03d}"
+        
+        # Filtra os dados de vendas da aba Folhagem_90d para a loja correspondente
+        df_vendas_loja = df_vendas_90d[df_vendas_90d["loja"].astype(str).str.zfill(3) == loja_id_str].copy()
+        
+        # Garante o tipo inteiro do código para o merge dar certo
+        df_vendas_loja["codigo"] = pd.to_numeric(df_vendas_loja["codigo"], errors="coerce").fillna(0).astype(int)
+        df_vendas_loja = df_vendas_loja.rename(columns={"codigo": "Código", "media_dia": "Venda 90d"})
+        
+        # Faz o merge para trazer a coluna Venda 90d
+        df_loja_view = pd.merge(df_loja_view, df_vendas_loja[["Código", "Venda 90d"]], on="Código", how="left")
+    else:
+        # Se a aba estiver vazia ou não tiver sido gerada, a coluna fica com 0
+        df_loja_view["Venda 90d"] = 0.0
+
+    df_loja_view["Venda 90d"] = df_loja_view["Venda 90d"].fillna(0.0).astype(float)
+    # -------------------------------------------------------------
+
     df_loja_view = df_loja_view.rename(columns={loja_selecionada: "Qtde"})
 
-    # Reordenar colunas
-    cols_order_view = ["Fornecedor", "Código", "Descrição", "Estoque", "Qtde"]
+    # Reordenar colunas incluindo a Venda 90d
+    cols_order_view = ["Fornecedor", "Código", "Descrição", "Estoque", "Venda 90d", "Qtde"]
     df_loja_view = df_loja_view[cols_order_view]
 
     with st.container(border=True):
-        st.info("💡 Preencha a *Qtde* desejada para cada produto. O **Estoque** é puxado automaticamente do sistema.")
+        st.info("💡 Preencha a *Qtde* desejada para cada produto. O **Estoque** e a **Média 90d** são puxados automaticamente.")
 
         col_cfg_loja = {
             "Fornecedor": st.column_config.TextColumn("Fornecedor", width=150, disabled=True),
             "Código":     st.column_config.NumberColumn("Cód", width=65, format="%d", disabled=True),
             "Descrição":  st.column_config.TextColumn("Produto", width=220, disabled=True),
             "Estoque":    st.column_config.NumberColumn("📦 Estoque", width=80, format="%d", disabled=True),
+            "Venda 90d":  st.column_config.NumberColumn("📊 Venda 90d (Média)", width=120, format="%.2f", disabled=True),
             "Qtde":       st.column_config.NumberColumn("🛒 Qtde", width=90, min_value=0, step=1),
         }
 
